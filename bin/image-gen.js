@@ -5,6 +5,7 @@ const path = require("node:path");
 const readline = require("node:readline");
 const { Command, InvalidArgumentError } = require("commander");
 
+const PACKAGE_VERSION = require("../package.json").version;
 const CREDENTIALS_PATH = path.join(__dirname, "credentials.json");
 const SETTINGS_PATH = path.join(__dirname, "settings.json");
 
@@ -203,7 +204,7 @@ const program = new Command();
 program
   .name("image")
   .description("Generate images with Gemini")
-  .version("0.1.0")
+  .version(PACKAGE_VERSION)
   .addHelpText("after", `
 Examples:
   $ image login
