@@ -1,6 +1,6 @@
 {
   "name": "image",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A small CLI for generating images with Gemini",
   "private": true,
   "type": "commonjs",

@@ -1,0 +1,21 @@
+# Repository metadata
+.git/
+.gitignore
+.github/
+
+# Dependencies and local state
+node_modules/
+bin/credentials.json
+bin/settings.json
+.env
+.env.*
+!.env.example
+
+# Development output
+coverage/
+.nyc_output/
+test-results/
+dist/
+build/
+out/
+*.log
