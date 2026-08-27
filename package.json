@@ -1,0 +1,17 @@
+{
+  "name": "image-gen-cli",
+  "version": "0.1.0",
+  "description": "A small CLI for generating images with Gemini",
+  "private": true,
+  "type": "commonjs",
+  "bin": {
+    "image-gen": "bin/image-gen.js"
+  },
+  "scripts": {
+    "start": "node bin/image-gen.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "commander": "^14.0.0"
+  }
+}
