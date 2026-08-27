@@ -1,3 +1,40 @@
+# Dependencies
 node_modules/
+
+# Local credentials and CLI state
 bin/credentials.json
 bin/settings.json
+.env
+.env.*
+!.env.example
+
+# Logs and runtime output
+*.log
+logs/
+*.pid
+*.pid.lock
+
+# Coverage and test output
+coverage/
+.nyc_output/
+test-results/
+
+# Build and distribution output
+dist/
+build/
+out/
+*.tgz
+
+# Caches and temporary files
+.cache/
+.tmp/
+tmp/
+temp/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
