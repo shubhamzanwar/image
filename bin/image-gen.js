@@ -201,20 +201,20 @@ function extensionForMimeType(mimeType) {
 
 const program = new Command();
 program
-  .name("image-gen")
+  .name("image")
   .description("Generate images with Gemini")
   .version("0.1.0")
   .addHelpText("after", `
 Examples:
-  $ image-gen login
-  $ image-gen generate --model gemini-3.1-flash-preview --aspect-ratio 16:9 --image-size 1K --prompt "A cinematic mountain landscape" --output mountain.png
+  $ image login
+  $ image login status
+  $ image generate --model gemini-3.1-flash-preview --aspect-ratio 16:9 --image-size 1K --prompt "A cinematic mountain landscape" --output mountain.png
 
 Credentials:
   login stores the API key in the default profile at bin/credentials.json.
-  GEMINI_API_KEY may be used instead of a saved profile for automation.
 `);
 
-program
+const loginCommand = program
   .command("login")
   .description("Save a Gemini API key to the default profile")
   .addHelpText("after", `
@@ -230,6 +230,20 @@ file permissions in bin/credentials.json.
     console.log(`Saved the default profile to ${CREDENTIALS_PATH}`);
   });
 
+loginCommand
+  .command("status")
+  .description("Show whether a Gemini API key is available")
+  .action(() => {
+    const credentials = readCredentials();
+    if (credentials.profiles.default?.apiKey) {
+      console.log(`Logged in via the default profile (${CREDENTIALS_PATH})`);
+      return;
+    }
+
+    console.error("Not logged in. Run `image login` first.");
+    process.exitCode = 1;
+  });
+
 const settingsCommand = program
   .command("settings")
   .description("View and update global generate settings")
@@ -238,10 +252,10 @@ Global settings are used by generate when the corresponding command-line
 option is omitted. Command-line options always take precedence.
 
 Examples:
-  $ image-gen settings list
-  $ image-gen settings set model gemini-3.1-flash-preview
-  $ image-gen settings set aspect-ratio 16:9
-  $ image-gen settings set image-size 1K
+  $ image settings list
+  $ image settings set model gemini-3.1-flash-preview
+  $ image settings set aspect-ratio 16:9
+  $ image settings set image-size 1K
 `);
 
 settingsCommand
@@ -281,14 +295,14 @@ The command writes an image file and prints its absolute path after success.
 With --json, stdout contains only a JSON result; progress and errors go to stderr.
 
 Examples:
-  $ image-gen generate \\
+  $ image generate \\
       --model gemini-3.1-flash-preview \\
       --aspect-ratio 16:9 \\
       --image-size 1K \\
       --prompt "A cinematic mountain landscape" \\
       --output mountain.png
 
-  $ image-gen generate \\
+  $ image generate \\
       --model gemini-3.1-flash-preview \\
       --aspect-ratio 1:1 \\
       --image-size 512 \\
@@ -298,8 +312,8 @@ Examples:
 `)
   .action(async (options) => {
     const credentials = readCredentials();
-    const apiKey = process.env.GEMINI_API_KEY || credentials.profiles.default?.apiKey;
-    if (!apiKey) throw new Error("No default profile found. Run `image-gen login` first.");
+    const apiKey = credentials.profiles.default?.apiKey;
+    if (!apiKey) throw new Error("No default profile found. Run `image login` first.");
 
     const prompt = requiredPositiveString(options.prompt, "--prompt");
     const globalSettings = validatedSettings(readSettings());
@@ -309,12 +323,12 @@ Examples:
     };
     for (const [key, definition] of Object.entries(SETTING_DEFINITIONS)) {
       if (generationOptions[key] === undefined) {
-        throw new Error(`${definition.flag} is required. Pass it to generate or set it with 'image-gen settings set ${definition.flag.slice(2)} <value>'.`);
+        throw new Error(`${definition.flag} is required. Pass it to generate or set it with 'image settings set ${definition.flag.slice(2)} <value>'.`);
       }
       generationOptions[key] = definition.validate(generationOptions[key]);
     }
     const image = await generateImage({ apiKey, ...generationOptions, prompt });
-    const output = path.resolve(options.output || `image-gen-${Date.now()}${extensionForMimeType(image.mimeType)}`);
+    const output = path.resolve(options.output || `image-${Date.now()}${extensionForMimeType(image.mimeType)}`);
     fs.writeFileSync(output, image.buffer);
     if (options.json) {
       console.log(JSON.stringify({
