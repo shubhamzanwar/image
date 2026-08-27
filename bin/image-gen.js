@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
-const readline = require("node:readline");
 const { Command, InvalidArgumentError } = require("commander");
 
 const PACKAGE_VERSION = require("../package.json").version;
 const CREDENTIALS_PATH = path.join(__dirname, "credentials.json");
 const SETTINGS_PATH = path.join(__dirname, "settings.json");
+const SKILL_PATH = path.join(__dirname, "..", "skill", "SKILL.md");
 
 const SETTING_DEFINITIONS = {
   model: {
@@ -88,47 +89,50 @@ function validatedSettings(settings) {
   return result;
 }
 
-function readSecret(question) {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    return new Promise((resolve, reject) => {
-      let value = "";
-      process.stdin.setEncoding("utf8");
-      process.stdin.on("data", (chunk) => { value += chunk; });
-      process.stdin.on("end", () => resolve(value.trim()));
-      process.stdin.on("error", reject);
-    });
-  }
-
-  return new Promise((resolve, reject) => {
-    const input = process.stdin;
-    const output = process.stdout;
-    output.write(question);
-    input.setRawMode(true);
-    input.resume();
-    input.setEncoding("utf8");
-
-    let value = "";
-    const onData = (chunk) => {
-      if (chunk === "\u0003") {
-        cleanup();
-        reject(new Error("Cancelled"));
-      } else if (chunk === "\r" || chunk === "\n") {
-        cleanup();
-        output.write("\n");
-        resolve(value.trim());
-      } else if (chunk === "\u007f") {
-        value = value.slice(0, -1);
-      } else {
-        value += chunk;
-      }
-    };
-    const cleanup = () => {
-      input.setRawMode(false);
-      input.pause();
-      input.removeListener("data", onData);
-    };
-    input.on("data", onData);
+async function promptForAgents() {
+  const { checkbox } = await import("@inquirer/prompts");
+  return checkbox({
+    message: "Which agents should receive the image-gen skill?",
+    choices: [
+      { name: "Codex", value: "codex" },
+      { name: "Claude Code", value: "claude" },
+    ],
+    instructions: "Use space to select, enter to install",
+    pageSize: 4,
   });
+}
+
+async function promptForApiKey() {
+  const { password } = await import("@inquirer/prompts");
+  return password({ message: "Gemini API key:", mask: "*" });
+}
+
+function writeSkillFile(destination) {
+  fs.mkdirSync(path.dirname(destination), { recursive: true });
+  fs.writeFileSync(destination, fs.readFileSync(SKILL_PATH, "utf8"), { mode: 0o644 });
+}
+
+function installCodexSkill() {
+  const destination = path.join(os.homedir(), ".codex", "skills", "image-gen", "SKILL.md");
+  writeSkillFile(destination);
+  return destination;
+}
+
+function installClaudeSkill() {
+  const claudeDir = path.join(os.homedir(), ".claude");
+  const skillDestination = path.join(claudeDir, "image-gen.md");
+  const memoryDestination = path.join(claudeDir, "CLAUDE.md");
+  writeSkillFile(skillDestination);
+
+  const importLine = "@~/.claude/image-gen.md";
+  const existingMemory = fs.existsSync(memoryDestination)
+    ? fs.readFileSync(memoryDestination, "utf8")
+    : "";
+  if (!existingMemory.split(/\r?\n/).some((line) => line.trim() === importLine)) {
+    const separator = existingMemory && !existingMemory.endsWith("\n") ? "\n" : "";
+    fs.writeFileSync(memoryDestination, `${existingMemory}${separator}${importLine}\n`, { mode: 0o644 });
+  }
+  return `${skillDestination} (imported by ${memoryDestination})`;
 }
 
 function mimeTypeForImage(imagePath) {
@@ -221,9 +225,9 @@ const loginCommand = program
   .addHelpText("after", `
 The API key is entered without being echoed and is stored with owner-only
 file permissions in bin/credentials.json.
-`)
+  `)
   .action(async () => {
-    const apiKey = await readSecret("Gemini API key: ");
+    const apiKey = (await promptForApiKey()).trim();
     if (!apiKey) throw new Error("API key cannot be empty.");
     const credentials = readCredentials();
     credentials.profiles.default = { apiKey };
@@ -243,6 +247,28 @@ loginCommand
 
     console.error("Not logged in. Run `image login` first.");
     process.exitCode = 1;
+  });
+
+const skillCommand = program
+  .command("skill")
+  .description("Print the full agent skill to stdout")
+  .action(() => {
+    process.stdout.write(fs.readFileSync(SKILL_PATH, "utf8"));
+  });
+
+skillCommand
+  .command("install")
+  .description("Install the agent skill for selected agents")
+  .action(async () => {
+    const agents = await promptForAgents();
+    if (agents.length === 0) {
+      throw new Error("Select at least one agent.");
+    }
+
+    const destinations = [];
+    if (agents.includes("codex")) destinations.push(installCodexSkill());
+    if (agents.includes("claude")) destinations.push(installClaudeSkill());
+    for (const destination of destinations) console.log(`Installed skill: ${destination}`);
   });
 
 const settingsCommand = program
